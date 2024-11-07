@@ -1,0 +1,9 @@
+{
+    "steps": [
+        {
+            "action": "updateFirmware",
+            "version": "jetson-l4t-35.4-ros-noetic-cortex-9.3-arm64"
+        }
+    ],
+    "rebootAfterJob": false
+}

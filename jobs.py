@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0.
 
+import json
 from awscrt import mqtt, http
 from awsiot import iotjobs, mqtt_connection_builder
 from concurrent.futures import Future
@@ -206,23 +207,37 @@ def job_thread_fn(job_id, job_document):
     try:
         print("Starting local work on job...")
         
-        # time.sleep(cmdData.input_job_time)
-        # Pass job_document to execute the job as per the new file
-        execute.run_job(job_id, job_document)  # This will now call execute.py
+        # Pass job_document to execute the job
+        success = execute.run_job(job_id, job_document)
 
-        print("Done working on job.")
-
-        print("Publishing request to update job status to SUCCEEDED...")
-        request = iotjobs.UpdateJobExecutionRequest(
-            thing_name=jobs_thing_name,
-            job_id=job_id,
-            status=iotjobs.JobStatus.SUCCEEDED)
+        if success:
+            print("Done working on job. Publishing request to update job status to SUCCEEDED...")
+            request = iotjobs.UpdateJobExecutionRequest(
+                thing_name=jobs_thing_name,
+                job_id=job_id,
+                status=iotjobs.JobStatus.SUCCEEDED
+            )
+        else:
+            print("Job failed. Publishing request to update job status to FAILED...")
+            request = iotjobs.UpdateJobExecutionRequest(
+                thing_name=jobs_thing_name,
+                job_id=job_id,
+                status=iotjobs.JobStatus.FAILED
+            )
+        
         publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
         publish_future.add_done_callback(on_publish_update_job_execution)
 
     except Exception as e:
-        exit(e)
-
+        print(f"Exception in job_thread_fn: {e}")
+        request = iotjobs.UpdateJobExecutionRequest(
+            thing_name=jobs_thing_name,
+            job_id=job_id,
+            status=iotjobs.JobStatus.FAILED
+        )
+        publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
+        publish_future.add_done_callback(on_publish_update_job_execution)
+    
 
 def on_publish_update_job_execution(future):
     # type: (Future) -> None

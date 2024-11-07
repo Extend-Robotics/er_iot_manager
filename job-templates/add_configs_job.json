@@ -1,0 +1,73 @@
+{
+    "rebootAfterJob": false,
+    "steps": [
+      {
+        "action": "addConfigs",
+        "configurations": {
+          "robokits": [
+            {
+              "robokitType": "xArm6",
+              "robotIP": "192.168.1.212",
+              "rosPort": 9090,
+              "endEffector": "xArmGripper",
+              "mainProgram": null,
+              "additionalProgram": null,
+              "robotPort": null,
+              "robotNumber": null,
+              "slotNumber": null,
+              "jointStatePubRate": 45,
+              "dobotType": null
+            },
+            {
+                "robokitType": "xArm6",
+                "robotIP": "192.168.1.222",
+                "rosPort": 9093,
+                "endEffector": "xArmGripper",
+                "mainProgram": null,
+                "additionalProgram": null,
+                "robotPort": null,
+                "robotNumber": null,
+                "slotNumber": null,
+                "jointStatePubRate": 45,
+                "dobotType": null
+              }
+          ],
+          "sensekits": [
+            {
+              "sensekitType": "zedX",
+              "rosPort": 9091,
+              "dataPort": 12345,
+              "colorCompressionConfig": "jetson_nvmpi.yaml",
+              "fps": 15,
+              "cameraId": 0,
+              "referenceFrameId": null,
+              "relativeFrameId": null,
+              "enableAudio": false,
+              "pubDownscaleFactor": 1.666666667,
+              "grabResolution": "HD1080",
+              "depthMode": "NEURAL",
+              "minDepth": 0.3,
+              "maxDepth": 3.0
+            },
+            {
+              "sensekitType": "zedX",
+              "rosPort": 9092,
+              "dataPort": 54321,
+              "colorCompressionConfig": "jetson_nvmpi.yaml",
+              "fps": 15,
+              "cameraId": 1,
+              "referenceFrameId": null,
+              "relativeFrameId": null,
+              "enableAudio": false,
+              "pubDownscaleFactor": 1.666666667,
+              "grabResolution": "HD1080",
+              "depthMode": "NEURAL",
+              "minDepth": 0.3,
+              "maxDepth": 3.0
+            }
+          ]
+        }
+      }
+    ]
+  }
+  

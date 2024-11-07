@@ -1,0 +1,9 @@
+{
+    "steps": [
+        {
+            "action": "runCommand",
+            "command": "echo 'Hello World!' > file.txt"
+        }
+    ],
+    "rebootAfterJob": false
+}
