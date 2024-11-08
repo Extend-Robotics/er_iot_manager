@@ -9,6 +9,38 @@ ECR_REPO = f"031532483464.dkr.ecr.{ECR_REGION}.amazonaws.com"
 DOCKER_IMAGE = "extend/cortex"
 BUCKET_NAME = "er-command-center"
 
+def update_device_env(new_version):
+    try:
+        # Dictionary to store environment variables
+        env_vars = {}
+        file_path = 'device.env'
+
+        # Read the file and update the firmwareVersion
+        with open(file_path, 'r') as file:
+            for line in file:
+                # Strip whitespace and newline characters
+                line = line.strip()
+                if line.startswith("export ") and '=' in line:
+                    # Remove 'export ' and split into key-value
+                    key, value = line.replace("export ", "").split('=', 1)
+                    # Check if the key is the firmwareVersion and update it
+                    if key == "firmwareVersion":
+                        env_vars[key] = new_version
+                    else:
+                        env_vars[key] = value
+
+        # Write the updated environment variables back to the file
+        with open(file_path, 'w') as file:
+            for key, value in env_vars.items():
+                file.write(f"export {key}={value}\n")
+
+        return True
+
+    except Exception as e:
+        print(f"Error setting device.env file: {e}")
+        return False
+
+
 def handle_update_firmware(version, ecr_region, ecr_repo, docker_image):
     """Handles the firmware update action."""
     if not version:
@@ -44,6 +76,9 @@ def handle_update_firmware(version, ecr_region, ecr_repo, docker_image):
     if subprocess.run(f"docker images -q {docker_image}:{version}", shell=True).returncode != 0:
         print(f"Error: Docker image {docker_image}:{version} not found after pull.")
         return False
+    
+    # Update the device.env
+    update_device_env(version)
 
     # Cleanup: remove old images
     cleanup_command = (

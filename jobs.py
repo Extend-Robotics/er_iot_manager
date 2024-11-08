@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0.
 
-import json
+import os
 from awscrt import mqtt, http
 from awsiot import iotjobs, mqtt_connection_builder
 from concurrent.futures import Future
@@ -48,6 +48,11 @@ mqtt_connection = None
 jobs_client = None
 jobs_thing_name = cmdData.input_thing_name
 
+# Set environment variables from cmdData values
+os.environ['THING_NAME'] = cmdData.input_thing_name
+os.environ['CERT_FILE_PATH'] = cmdData.input_cert
+os.environ['PRIVATE_KEY_PATH'] = cmdData.input_key
+os.environ['ROOT_CA_PATH'] = cmdData.input_ca
 
 class LockedData:
     def __init__(self):

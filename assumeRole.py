@@ -1,12 +1,10 @@
 import requests
 import subprocess
+import os
 
 # Replace with your endpoint, role alias, and certificate paths
 credential_provider_endpoint = "https://c1yqqljqzvtfa.credentials.iot.eu-west-2.amazonaws.com"
 role_alias = "ClientDevicesRoleAlias"
-cert_path = "CortexQA.cert.pem"
-key_path = "CortexQA.private.key"
-root_ca_path = "root-CA.crt"
 
 # Construct the URL to get temporary credentials
 url = f"{credential_provider_endpoint}/role-aliases/{role_alias}/credentials"
@@ -14,6 +12,10 @@ url = f"{credential_provider_endpoint}/role-aliases/{role_alias}/credentials"
 def get_temporary_credentials():
     """Retrieves temporary credentials from AWS IoT Credential Provider and configures AWS CLI."""
     try:
+        cert_path = os.getenv('CERT_FILE_PATH')
+        key_path = os.getenv('PRIVATE_KEY_PATH')
+        root_ca_path = os.getenv('ROOT_CA_PATH')
+
         response = requests.get(
             url,
             cert=(cert_path, key_path),

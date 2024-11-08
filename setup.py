@@ -7,7 +7,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "boto3",
-        "awsiotsdk"
+        "awsiotsdk",
+        "python-dotenv"
     ],
     python_requires='>=3.6',
 )
