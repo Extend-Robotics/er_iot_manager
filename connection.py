@@ -23,15 +23,21 @@ mqtt_connection = mqtt_connection_builder.mtls_from_path(
 backend_url = "http://192.168.0.43:8080/devices/status"
 connection_status = "Disconnected"
 
-def notify_backend(status):
-    try:
-        response = requests.post(backend_url, json={"status": status})
-        response.raise_for_status()
-        print(f"Status updated to {status}")
-        return True
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to update status: {e}")
-        return False
+# Function to notify the backend of device status
+def notify_backend(status, retries=5, backoff_factor=1):
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = requests.post(backend_url, json={"status": status})
+            response.raise_for_status()
+            print(f"Status updated to {status}")
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to update status: {e}")
+            attempt += 1
+            time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
+    print(f"Failed to update status after {retries} attempts.")
+    return False
 
 # Callback for connection interruptions (e.g., internet outage)
 def on_connection_interrupted(connection, error, **kwargs):
@@ -62,7 +68,7 @@ try:
     while True:
         if connection_status == "Connected":
             if not notify_backend("Connected"):
-                # If unable to notify backend, assume disconnected and try again on next heartbeat
+                # If unable to notify backend, assume disconnected and retry
                 connection_status = "Disconnected"
         time.sleep(5)
 except KeyboardInterrupt:
