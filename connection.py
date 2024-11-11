@@ -2,6 +2,7 @@ from awscrt import mqtt
 from awsiot import mqtt_connection_builder
 import requests
 from utils.command_line_utils import CommandLineUtils
+import time
 
 # Parse command-line arguments
 cmdData = CommandLineUtils.parse_sample_input_jobs()
@@ -27,22 +28,26 @@ def notify_backend(status):
         response = requests.post(backend_url, json={"status": status})
         response.raise_for_status()
         print(f"Status updated to {status}")
+        return True
     except requests.exceptions.RequestException as e:
         print(f"Failed to update status: {e}")
+        return False
 
-# Callback for connection interruptions
+# Callback for connection interruptions (e.g., internet outage)
 def on_connection_interrupted(connection, error, **kwargs):
     global connection_status
-    print("Connection interrupted. Error:", error)
-    connection_status = "Disconnected"
-    notify_backend(connection_status)
+    if connection_status != "Disconnected":
+        print("Connection interrupted. Error:", error)
+        connection_status = "Disconnected"
+        notify_backend(connection_status)
 
 # Callback for connection resumptions
 def on_connection_resumed(connection, return_code, session_present, **kwargs):
     global connection_status
-    print("Connection resumed. Return code:", return_code)
-    connection_status = "Connected" if return_code == mqtt.ConnectReturnCode.ACCEPTED else "Disconnected"
-    notify_backend(connection_status)
+    if return_code == mqtt.ConnectReturnCode.ACCEPTED and connection_status != "Connected":
+        print("Connection resumed.")
+        connection_status = "Connected"
+        notify_backend(connection_status)
 
 # Connect to AWS IoT Core
 print(f"Connecting to {cmdData.input_endpoint} with client ID {cmdData.input_clientId}...")
@@ -52,9 +57,14 @@ connection_status = "Connected"
 notify_backend(connection_status)
 print("Connected!")
 
+# Send heartbeat every 5 seconds
 try:
     while True:
-        pass  # Keep the script running to allow the connection callbacks to work
+        if connection_status == "Connected":
+            if not notify_backend("Connected"):
+                # If unable to notify backend, assume disconnected and try again on next heartbeat
+                connection_status = "Disconnected"
+        time.sleep(5)
 except KeyboardInterrupt:
     print("Disconnecting...")
 finally:
