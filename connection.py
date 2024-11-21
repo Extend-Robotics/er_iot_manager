@@ -20,7 +20,7 @@ mqtt_connection = mqtt_connection_builder.mtls_from_path(
 )
 
 device_id = cmdData.input_thing_name  # Unique identifier for the device, e.g., the thing_name or client_id
-backend_url = "http://192.168.0.43:8080/devices/status"  # Backend URL for notifying connection status
+backend_url = "http://192.168.0.43:8080/api/devices/status"  # Backend URL for notifying connection status
 connection_status = "Disconnected"
 
 def notify_backend(status, retries=5, backoff_factor=1):
@@ -30,7 +30,7 @@ def notify_backend(status, retries=5, backoff_factor=1):
         try:
             response = requests.post(backend_url, json=payload)
             response.raise_for_status()
-            print(f"Status updated to {status} for device {device_id}")
+            # print(f"Status updated to {status} for device {device_id}")
             return True
         except requests.exceptions.RequestException as e:
             print(f"Failed to update status: {e}")

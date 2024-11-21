@@ -1,7 +1,7 @@
 {
     "steps": [
         {
-            "action": "runCommand",
+            "action": "RUN_COMMAND",
             "command": "echo 'Hello World!' > file.txt"
         }
     ],

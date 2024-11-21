@@ -9,15 +9,15 @@ if ! python3 --version &> /dev/null; then
 fi
 
 # Check to see if root CA file exists, download if not
-if [ ! -f $HOME/root-CA.crt ]; then
+if [ ! -f $HOME/.iot_kit/root-CA.crt ]; then
   printf "\nDownloading AWS IoT Root CA certificate from AWS...\n"
-  curl https://www.amazontrust.com/repository/AmazonRootCA1.pem > $HOME/root-CA.crt
+  curl https://www.amazontrust.com/repository/AmazonRootCA1.pem > $HOME/.iot_kit/root-CA.crt
 fi
 
 # Clone or pull the latest changes from Extend-Robotics/er_iot_manager repository
 if [ ! -d $HOME/er_iot_manager ]; then
   printf "\nCloning the Extend-Robotics er_iot_manager repository...\n"
-  git clone https://github.com/Extend-Robotics/er_iot_manager.git $HOME --recursive
+  git clone https://github.com/Extend-Robotics/er_iot_manager.git $HOME/er_iot_manager --recursive
 else
   printf "\nPulling the latest changes from the er_iot_manager repository...\n"
   cd $HOME/er_iot_manager
@@ -29,23 +29,20 @@ fi
 printf "\nRunning setup.py to install dependencies for er_iot_manager...\n"
 python3 -m pip install $HOME/er_iot_manager
 
-source $HOME/device.env
-echo $HOME
-echo $thingName
+source $HOME/.iot_kit/device.env
 
-# run pub/sub sample app using certificates downloaded in package
+# RUn the connection and jobs python scripts
 printf "\nRunning IoT manager application...\n"
 python3 $HOME/er_iot_manager/connection.py \
         --endpoint a34wwkbw0n00uf-ats.iot.eu-west-2.amazonaws.com \
-        --key $HOME/$thingName.private.key \
-        --cert $HOME/$thingName.cert.pem \
+        --key $HOME/.iot_kit/$thingName.private.key \
+        --cert $HOME/.iot_kit/$thingName.cert.pem \
         --thing_name $thingName \
-        --ca_file $HOME/root-CA.crt &
+        --ca_file $HOME/.iot_kit/root-CA.crt &
 
 python3 $HOME/er_iot_manager/jobs.py \
         --endpoint a34wwkbw0n00uf-ats.iot.eu-west-2.amazonaws.com \
-        --key $HOME/$thingName.private.key \
-        --cert $HOME/$thingName.cert.pem \
+        --key $HOME/.iot_kit/$thingName.private.key \
+        --cert $HOME/.iot_kit/$thingName.cert.pem \
         --thing_name $thingName \
-        --ca_file $HOME/root-CA.crt &
-
+        --ca_file $HOME/.iot_kit/root-CA.crt &

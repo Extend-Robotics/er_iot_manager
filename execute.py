@@ -3,11 +3,19 @@ import assumeRole
 import time
 import os
 import boto3
+from enum import Enum
 
 ECR_REGION = "eu-west-2"
 ECR_REPO = f"031532483464.dkr.ecr.{ECR_REGION}.amazonaws.com"
 DOCKER_IMAGE = "extend/cortex"
 BUCKET_NAME = "er-command-center"
+
+
+class Actions(Enum):
+    UPDATE_FIRMWARE = 'UPDATE_FIRMWARE'
+    ADD_CONFIGS = 'ADD_CONFIGS'
+    RUN_COMMAND = 'RUN_COMMAND'
+
 
 def update_device_env(new_version):
     try:
@@ -170,7 +178,7 @@ def handle_add_configs(robokits, sensekits):
         if robokit_type and robokit_type not in downloaded_types:
             # Define S3 file key and local path
             s3_key = f"customer/terminal_{robokit_type}.bash"
-            local_path = f"{base_dir}/extend_autostart/robokit/terminal_{robokit_type}.bash"
+            local_path = f"{base_dir}/extend_autostart/robokit/terminal_{robokit_type.lower()}.bash"
 
             # Download from S3
             download_file_from_s3(s3_client, s3_key, local_path)
@@ -178,7 +186,7 @@ def handle_add_configs(robokits, sensekits):
 
         # Append the launcher command for this robokit to firmware_launcher.bash
         launcher_commands.append(
-            f"(source ${{HOME}}/firmware_configs/robokit/{ros_port}.env && bash /home/extend/extend_autostart/robokit/terminal_{robokit_type}.bash)&"
+            f"(source ${{HOME}}/firmware_configs/robokit/{ros_port}.env && bash /home/extend/extend_autostart/robokit/terminal_{robokit_type.lower()}.bash)&"
         )
 
     # Process each sensekit
@@ -197,7 +205,7 @@ def handle_add_configs(robokits, sensekits):
         if sensekit_type and sensekit_type not in downloaded_types:
             # Define S3 file key and local path
             s3_key = f"customer/terminal_{sensekit_type}.bash"
-            local_path = f"{base_dir}/extend_autostart/sensekit/terminal_{sensekit_type}.bash"
+            local_path = f"{base_dir}/extend_autostart/sensekit/terminal_{sensekit_type.lower()}.bash"
 
             # Download from S3
             download_file_from_s3(s3_client, s3_key, local_path)
@@ -205,7 +213,7 @@ def handle_add_configs(robokits, sensekits):
 
         # Append the launcher command for this sensekit to firmware_launcher.bash
         launcher_commands.append(
-            f"(source ${{HOME}}/firmware_configs/sensekit/{ros_port}.env && bash /home/extend/extend_autostart/sensekit/terminal_{sensekit_type}.bash)&"
+            f"(source ${{HOME}}/firmware_configs/sensekit/{ros_port}.env && bash /home/extend/extend_autostart/sensekit/terminal_{sensekit_type.lower()}.bash)&"
         )
 
     # Append commands to firmware_launcher.bash
@@ -246,12 +254,12 @@ def run_job(job_id, job_document):
         for step in steps:
             action = step.get("action")
 
-            if action == "updateFirmware":
+            if action == Actions.UPDATE_FIRMWARE.value:
                 version = step.get("version")
                 if not handle_update_firmware(version, ECR_REGION, ECR_REPO, DOCKER_IMAGE):
                     return False
                 
-            elif action == "addConfigs":
+            elif action == Actions.ADD_CONFIGS.value:
                 # Extract robokits and sensekits from configurations in the step
                 configurations = step.get("configurations", {})
                 robokits = configurations.get("robokits", [])
@@ -261,7 +269,7 @@ def run_job(job_id, job_document):
                 if not handle_add_configs(robokits, sensekits):
                     return False
                 
-            elif action == "runCommand":
+            elif action == Actions.RUN_COMMAND.value:
                 command = step.get("command")
                 if not handle_run_command(command):
                     return False

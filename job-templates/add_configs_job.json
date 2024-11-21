@@ -2,7 +2,7 @@
     "rebootAfterJob": false,
     "steps": [
       {
-        "action": "addConfigs",
+        "action": "ADD_CONFIGS",
         "configurations": {
           "robokits": [
             {
