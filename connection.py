@@ -25,7 +25,7 @@ connection_status = "Disconnected"
 
 def notify_backend(status, retries=5, backoff_factor=1):
     attempt = 0
-    payload = {"device_id": device_id, "status": status}
+    payload = {"deviceId": device_id, "status": status}
     while attempt < retries:
         try:
             response = requests.post(backend_url, json=payload)

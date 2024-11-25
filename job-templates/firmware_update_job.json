@@ -2,8 +2,11 @@
     "steps": [
         {
             "action": "UPDATE_FIRMWARE",
-            "version": "jetson-l4t-35.4-ros-noetic-cortex-9.3-arm64"
+            "parameters": {
+                "firmwareVersion": "jetson-l4t-35.4-ros-noetic-cortex-9.3-arm64",
+                "deleteOldImages": true
+            }
         }
     ],
-    "rebootAfterJob": false
+    "rebootAfter": false
 }

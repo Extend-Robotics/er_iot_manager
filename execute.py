@@ -21,7 +21,13 @@ def update_device_env(new_version):
     try:
         # Dictionary to store environment variables
         env_vars = {}
-        file_path = 'device.env'
+        
+        # Get the file path
+        base_dir = os.path.expanduser("~")
+        file_path = os.path.join(base_dir, ".iot_kit", "device.env")
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"device.env file not found in {file_path}")
 
         # Read the file and update the firmwareVersion
         with open(file_path, 'r') as file:
@@ -249,28 +255,28 @@ def run_job(job_id, job_document):
         
         # Extract parameters from the job document
         steps = job_document.get("steps", [])
-        reboot_after_job = job_document.get("rebootAfterJob", False)
+        reboot_after_job = job_document.get("rebootAfter", False)
 
         for step in steps:
             action = step.get("action")
 
             if action == Actions.UPDATE_FIRMWARE.value:
-                version = step.get("version")
+                version = step.get("parameters", {}).get("firmwareVersion")
                 if not handle_update_firmware(version, ECR_REGION, ECR_REPO, DOCKER_IMAGE):
                     return False
                 
             elif action == Actions.ADD_CONFIGS.value:
-                # Extract robokits and sensekits from configurations in the step
-                configurations = step.get("configurations", {})
-                robokits = configurations.get("robokits", [])
-                sensekits = configurations.get("sensekits", [])
+                # Extract robokits and sensekits from parameters in the step
+                parameters = step.get("parameters", {})
+                robokits = parameters.get("robokits", [])
+                sensekits = parameters.get("sensekits", [])
                 
                 # Call add_configs with robokits and sensekits
                 if not handle_add_configs(robokits, sensekits):
                     return False
                 
             elif action == Actions.RUN_COMMAND.value:
-                command = step.get("command")
+                command = step.get("parameters", {}).get("command")
                 if not handle_run_command(command):
                     return False
                 
@@ -278,7 +284,7 @@ def run_job(job_id, job_document):
                 print(f"Unknown action: {action}")
                 return False
 
-        # Schedule a reboot if rebootAfterJob is set to true
+        # Schedule a reboot if rebootAfter is set to true
         if reboot_after_job:
             print("Job complete. Scheduling device to restart in 15 seconds.")
             subprocess.Popen("nohup shutdown -r +0.25 &", shell=True)

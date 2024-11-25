@@ -1,9 +1,8 @@
 {
-    "rebootAfterJob": false,
     "steps": [
       {
         "action": "ADD_CONFIGS",
-        "configurations": {
+        "parameters": {
           "robokits": [
             {
               "robokitType": "xArm6",
@@ -68,6 +67,6 @@
           ]
         }
       }
-    ]
-  }
-  
+    ],
+    "rebootAfter": false
+  }  

@@ -2,8 +2,10 @@
     "steps": [
         {
             "action": "RUN_COMMAND",
-            "command": "echo 'Hello World!' > file.txt"
+            "parameters": {
+                "command": "echo 'Hello World!' > file.txt"
+            }
         }
     ],
-    "rebootAfterJob": false
+    "rebootAfter": false
 }
