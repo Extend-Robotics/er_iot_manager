@@ -287,7 +287,7 @@ def run_job(job_id, job_document):
         # Schedule a reboot if rebootAfter is set to true
         if reboot_after_job:
             print("Job complete. Scheduling device to restart in 15 seconds.")
-            subprocess.Popen("nohup shutdown -r +0.25 &", shell=True)
+            subprocess.Popen("nohup sh -c 'sleep 15; shutdown -r now' &", shell=True)
             time.sleep(1)  # Optional: wait a moment for scheduling to ensure stability
 
     except Exception as e:

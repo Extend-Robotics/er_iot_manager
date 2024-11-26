@@ -38,11 +38,13 @@ python3 $HOME/er_iot_manager/connection.py \
         --key $HOME/.iot_kit/$thingName.private.key \
         --cert $HOME/.iot_kit/$thingName.cert.pem \
         --thing_name $thingName \
-        --ca_file $HOME/.iot_kit/root-CA.crt &
+        --ca_file $HOME/.iot_kit/root-CA.crt > $HOME/.iot_kit/connection.log 2>&1 &
 
 python3 $HOME/er_iot_manager/jobs.py \
         --endpoint a34wwkbw0n00uf-ats.iot.eu-west-2.amazonaws.com \
         --key $HOME/.iot_kit/$thingName.private.key \
         --cert $HOME/.iot_kit/$thingName.cert.pem \
         --thing_name $thingName \
-        --ca_file $HOME/.iot_kit/root-CA.crt &
+        --ca_file $HOME/.iot_kit/root-CA.crt > $HOME/.iot_kit/jobs.log 2>&1 &
+
+wait

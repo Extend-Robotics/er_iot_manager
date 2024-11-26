@@ -10,6 +10,8 @@ import threading
 import time
 import traceback
 import time
+import requests
+
 from utils.command_line_utils import CommandLineUtils
 import execute
 
@@ -209,10 +211,15 @@ def on_start_next_pending_job_execution_rejected(rejected):
 
 
 def job_thread_fn(job_id, job_document):
+    backend_url = "http://192.168.0.43:8080/api/jobs/status"  # Backend URL for notifying job status
+    def updateJobStatus(status):
+        requests.post(backend_url, json={"jobId": job_id, "status": status})
+
     try:
         print("Starting local work on job...")
         
         # Pass job_document to execute the job
+        updateJobStatus(iotjobs.JobStatus.IN_PROGRESS)
         success = execute.run_job(job_id, job_document)
 
         if success:
@@ -232,6 +239,7 @@ def job_thread_fn(job_id, job_document):
         
         publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
         publish_future.add_done_callback(on_publish_update_job_execution)
+        updateJobStatus(request.status)
 
     except Exception as e:
         print(f"Exception in job_thread_fn: {e}")
@@ -242,6 +250,7 @@ def job_thread_fn(job_id, job_document):
         )
         publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
         publish_future.add_done_callback(on_publish_update_job_execution)
+        updateJobStatus(request.status)
     
 
 def on_publish_update_job_execution(future):
