@@ -25,21 +25,25 @@ thing_name = cmdData.input_thing_name  # Unique identifier for the device, e.g.,
 backend_url = "http://192.168.0.43:8080/api/devices/status"  # Backend URL for notifying connection status
 connection_status = "Disconnected"
 
+
 def notify_backend(status, retries=5, backoff_factor=1):
     attempt = 0
     payload = {"thingName": thing_name, "status": status}
-    while attempt < retries:
+    while True:  # Infinite retry loop
         try:
             response = requests.post(backend_url, json=payload)
             response.raise_for_status()
-            # print(f"Status updated to {status} for device {device_id}")
+            # print(f"Status updated to {status} for device {thing_id}")
             return True
         except requests.exceptions.RequestException as e:
             print(f"Failed to update status: {e}")
             attempt += 1
             time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
-    print(f"Failed to update status after {retries} attempts for device {thing_name}.")
-    return False
+            # Optionally, you could set a limit to prevent infinite retries under certain conditions
+            # if attempt > some_threshold:
+            #     print("Max attempts reached, giving up.")
+            #     break
+
 
 # Callback for connection interruptions (e.g., internet outage)
 def on_connection_interrupted(connection, error, **kwargs):
