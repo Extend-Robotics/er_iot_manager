@@ -5,10 +5,11 @@ import os
 import boto3
 from enum import Enum
 
-ECR_REGION = "eu-west-2"
-ECR_REPO = f"031532483464.dkr.ecr.{ECR_REGION}.amazonaws.com"
 DOCKER_IMAGE = "extend/cortex"
 BUCKET_NAME = "er-command-center"
+# device.env file path
+base_dir = os.path.expanduser("~")
+file_path = os.path.join(base_dir, ".iot_kit", "device.env")
 
 
 class Actions(Enum):
@@ -17,31 +18,37 @@ class Actions(Enum):
     RUN_COMMAND = 'RUN_COMMAND'
 
 
-def update_device_env(new_version):
+def load_env_vars():
+    """Loads environment variables from device.env."""
     try:
         # Dictionary to store environment variables
         env_vars = {}
         
-        # Get the file path
-        base_dir = os.path.expanduser("~")
-        file_path = os.path.join(base_dir, ".iot_kit", "device.env")
-        
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"device.env file not found in {file_path}")
 
-        # Read the file and update the firmwareVersion
+        # Read the file and load variables into a dictionary
         with open(file_path, 'r') as file:
             for line in file:
-                # Strip whitespace and newline characters
                 line = line.strip()
                 if line.startswith("export ") and '=' in line:
-                    # Remove 'export ' and split into key-value
                     key, value = line.replace("export ", "").split('=', 1)
-                    # Check if the key is the firmwareVersion and update it
-                    if key == "firmwareVersion":
-                        env_vars[key] = new_version
-                    else:
-                        env_vars[key] = value
+                    env_vars[key] = value
+
+        return env_vars
+
+    except Exception as e:
+        print(f"Error loading device.env file: {e}")
+        return {}
+
+
+def update_device_env(new_version):
+    try:
+        # Load the current environment variables from device.env
+        env_vars = load_env_vars()
+
+        # Update the firmwareVersion variable
+        env_vars["firmwareVersion"] = new_version
 
         # Write the updated environment variables back to the file
         with open(file_path, 'w') as file:
@@ -55,11 +62,22 @@ def update_device_env(new_version):
         return False
 
 
-def handle_update_firmware(version, ecr_region, ecr_repo, docker_image):
+def handle_update_firmware(version, deleteOldImages):
     """Handles the firmware update action."""
     if not version:
         print("Firmware version not specified.")
         return False
+
+    # Load region and accountId from device.env
+    env_vars = load_env_vars()
+    ecr_region = env_vars.get("region")
+    account_id = env_vars.get("accountId")
+
+    if not ecr_region or not account_id:
+        print("Error: 'region' or 'accountId' not found in device.env. Aborting job.")
+        return False
+
+    ecr_repo = f"{account_id}.dkr.ecr.{ecr_region}.amazonaws.com"
 
     # Get temporary credentials and configure AWS CLI
     credentials = assumeRole.get_temporary_credentials()
@@ -78,7 +96,7 @@ def handle_update_firmware(version, ecr_region, ecr_repo, docker_image):
         return False
 
     # Pull the Docker image
-    image_tag = f"{ecr_repo}/{docker_image}:{version}"
+    image_tag = f"{ecr_repo}/{DOCKER_IMAGE}:{version}"
     print(f"Pulling Docker image: {image_tag}")
     pull_command = f"docker pull {image_tag}"
     pull_result = subprocess.run(pull_command, shell=True, capture_output=True, text=True)
@@ -87,20 +105,24 @@ def handle_update_firmware(version, ecr_region, ecr_repo, docker_image):
         return False
 
     # Verify the Docker image
-    if subprocess.run(f"docker images -q {docker_image}:{version}", shell=True).returncode != 0:
-        print(f"Error: Docker image {docker_image}:{version} not found after pull.")
+    if subprocess.run(f"docker images -q {DOCKER_IMAGE}:{version}", shell=True).returncode != 0:
+        print(f"Error: Docker image {DOCKER_IMAGE}:{version} not found after pull.")
         return False
     
     # Update the device.env
     update_device_env(version)
 
-    # Cleanup: remove old images
-    cleanup_command = (
-        f"docker images --format '{{{{.ID}}}} {{{{.Repository}}}}:{{{{.Tag}}}}' | "
-        f"grep -v '{docker_image}:{version}' | awk '{{print $1}}' | xargs -r docker rmi -f"
-    )
-    subprocess.run(cleanup_command, shell=True)
-    print("Old Docker images removed.")
+    if deleteOldImages:
+        # Cleanup: remove old images
+        cleanup_command = (
+            "docker images --format '{{.ID}} {{.Repository}}:{{.Tag}}' | "
+            f"grep -v \"$(printf '%s:%s' '{DOCKER_IMAGE}' '{version}')\" | "
+            "awk '{print $1}' | "
+            "xargs --no-run-if-empty docker rmi -f"
+        )
+
+        subprocess.run(cleanup_command, shell=True)
+        print("Old Docker images removed.")
 
     # Logout from ECR for security
     logout_command = f"docker logout {ecr_repo}"
@@ -128,11 +150,14 @@ def handle_add_configs(robokits, sensekits):
     if not credentials:
         print("Failed to retrieve temporary credentials. Aborting.")
         return False
+    
+    env_vars = load_env_vars()
+    ecr_region = env_vars.get("region")
 
     # Initialize S3 client with temporary credentials
     s3_client = boto3.client(
         's3',
-        region_name=ECR_REGION,
+        region_name=ecr_region,
         aws_access_key_id=credentials["aws_access_key_id"],
         aws_secret_access_key=credentials["aws_secret_access_key"],
         aws_session_token=credentials["aws_session_token"]
@@ -140,8 +165,6 @@ def handle_add_configs(robokits, sensekits):
 
     # Set base directories for testing and actual implementation
     # Uncomment the following line for actual implementation
-    base_dir = os.path.expanduser("~")  # Use $HOME directory
-    # base_dir = "."  # Current directory for testing
 
     # Ensure base directories exist
     os.makedirs(f"{base_dir}/firmware_configs/robokit", exist_ok=True)
@@ -262,7 +285,8 @@ def run_job(job_id, job_document):
 
             if action == Actions.UPDATE_FIRMWARE.value:
                 version = step.get("parameters", {}).get("firmwareVersion")
-                if not handle_update_firmware(version, ECR_REGION, ECR_REPO, DOCKER_IMAGE):
+                deleteOldImages = step.get("parameters", {}).get("deleteOldImages")
+                if not handle_update_firmware(version, deleteOldImages):
                     return False
                 
             elif action == Actions.ADD_CONFIGS.value:
