@@ -163,9 +163,6 @@ def handle_add_configs(robokits, sensekits):
         aws_session_token=credentials["aws_session_token"]
     )
 
-    # Set base directories for testing and actual implementation
-    # Uncomment the following line for actual implementation
-
     # Ensure base directories exist
     os.makedirs(f"{base_dir}/firmware_configs/robokit", exist_ok=True)
     os.makedirs(f"{base_dir}/firmware_configs/sensekit", exist_ok=True)
@@ -191,59 +188,116 @@ def handle_add_configs(robokits, sensekits):
     # Prepare lines to append to firmware_launcher.bash
     launcher_commands = []
 
-    # Process each robokit
-    for robokit in robokits:
-        ros_port = robokit.get("rosPort")
+    # # Process each robokit
+    # for robokit in robokits:
+    #     ros_port = robokit.get("rosPort")
+    #     if ros_port is None:
+    #         print("Error: rosPort is required for robokit configuration")
+    #         continue
+
+    #     # Generate the environment file for each robokit
+    #     filename = f"{ros_port}.env"
+    #     write_env_file(f"{base_dir}/firmware_configs/robokit", filename, robokit, 'robokit')
+
+    #     # Download the terminal script for this robokit type
+    #     robokit_type = robokit.get("robokitType")
+    #     if robokit_type and robokit_type not in downloaded_types:
+    #         # Define S3 file key and local path
+    #         s3_key = f"customer/terminal_{robokit_type}.bash"
+    #         local_path = f"{base_dir}/extend_autostart/robokit/terminal_{robokit_type.lower()}.bash"
+
+    #         # Download from S3
+    #         download_file_from_s3(s3_client, s3_key, local_path)
+    #         downloaded_types.add(robokit_type)  # Mark this type as downloaded
+
+    #         ### SPECIFIC ROBOKIT SETTINGS ###
+    #         # Universal Robots
+    #         if "ur" not in downloaded_types and robokit_type.lower().startswith("ur"):
+    #             # Define S3 file key and local path
+    #             s3_key = f"customer/terminal_ur.bash"
+    #             local_path = f"{base_dir}/extend_autostart/robokit/terminal_ur.bash"
+
+    #             # Download from S3
+    #             download_file_from_s3(s3_client, s3_key, local_path)
+    #             downloaded_types.add("ur")  # Mark this type as downloaded
+
+    #     # Append the launcher command for this robokit to firmware_launcher.bash
+    #     launcher_commands.append(
+    #         f"(source ${{HOME}}/firmware_configs/robokit/{ros_port}.env && bash /home/extend/extend_autostart/robokit/terminal_{robokit_type.lower()}.bash)&"
+    #     )
+
+    # # Process each sensekit
+    # for sensekit in sensekits:
+    #     ros_port = sensekit.get("rosPort")
+    #     if ros_port is None:
+    #         print("Error: rosPort is required for sensekit configuration")
+    #         continue
+
+    #     # Generate the environment file for each sensekit
+    #     filename = f"{ros_port}.env"
+    #     write_env_file(f"{base_dir}/firmware_configs/sensekit", filename, sensekit, 'sensekit')
+
+    #     # Download the terminal script for this sensekit type
+    #     sensekit_type = sensekit.get("sensekitType")
+    #     if sensekit_type and sensekit_type not in downloaded_types:
+    #         # Define S3 file key and local path
+    #         s3_key = f"customer/terminal_{sensekit_type}.bash"
+    #         local_path = f"{base_dir}/extend_autostart/sensekit/terminal_{sensekit_type.lower()}.bash"
+
+    #         # Download from S3
+    #         download_file_from_s3(s3_client, s3_key, local_path)
+    #         downloaded_types.add(sensekit_type)  # Mark this type as downloaded
+
+    #     # Append the launcher command for this sensekit to firmware_launcher.bash
+    #     launcher_commands.append(
+    #         f"(source ${{HOME}}/firmware_configs/sensekit/{ros_port}.env && bash /home/extend/extend_autostart/sensekit/terminal_{sensekit_type.lower()}.bash)&"
+    #     )
+
+    def process_kit(kit, kit_type):
+        """
+        Processes each kit (either robokit or sensekit), generating environment files, downloading terminal scripts,
+        and appending the launcher commands.
+        """
+        ros_port = kit.get("rosPort")
         if ros_port is None:
-            print("Error: rosPort is required for robokit configuration")
-            continue
+            print(f"Error: rosPort is required for {kit_type} configuration")
+            return
 
-        # Generate the environment file for each robokit
+        # Generate the environment file for this kit
         filename = f"{ros_port}.env"
-        write_env_file(f"{base_dir}/firmware_configs/robokit", filename, robokit, 'robokit')
+        write_env_file(f"{base_dir}/firmware_configs/{kit_type}", filename, kit, kit_type)
 
-        # Download the terminal script for this robokit type
-        robokit_type = robokit.get("robokitType")
-        if robokit_type and robokit_type not in downloaded_types:
-            # Define S3 file key and local path
-            s3_key = f"customer/terminal_{robokit_type}.bash"
-            local_path = f"{base_dir}/extend_autostart/robokit/terminal_{robokit_type.lower()}.bash"
-
+        # Download the terminal script for this kit type
+        kit_specific_type = kit.get(f"{kit_type}Type")
+        if kit_specific_type and kit_specific_type not in downloaded_types:
+            # Define S3 file key and local path for the specific kit type
+            s3_key = f"customer/terminal_{kit_specific_type}.bash"
+            local_path = f"{base_dir}/extend_autostart/{kit_type}/{kit_specific_type.lower()}.bash"
+            
             # Download from S3
             download_file_from_s3(s3_client, s3_key, local_path)
-            downloaded_types.add(robokit_type)  # Mark this type as downloaded
+            downloaded_types.add(kit_specific_type)  # Mark this type as downloaded
 
-        # Append the launcher command for this robokit to firmware_launcher.bash
+            # Universal Robots special handling
+            if (kit_type == "robokit") and ("ur" not in downloaded_types) and (kit_specific_type.lower().startswith("ur")):
+                s3_key = f"customer/terminal_ur.bash"
+                local_path = f"{base_dir}/extend_autostart/{kit_type}/terminal_ur.bash"
+                download_file_from_s3(s3_client, s3_key, local_path)
+                downloaded_types.add("ur")  # Mark UR type as downloaded
+
+        # Append the launcher command for this kit
         launcher_commands.append(
-            f"(source ${{HOME}}/firmware_configs/robokit/{ros_port}.env && bash /home/extend/extend_autostart/robokit/terminal_{robokit_type.lower()}.bash)&"
+            f"(source ${{HOME}}/firmware_configs/{kit_type}/{ros_port}.env && bash /home/extend/extend_autostart/{kit_type}/terminal_{kit_specific_type.lower()}.bash)&"
         )
+
+    # Process each robokit
+    for robokit in robokits:
+        process_kit(robokit, 'robokit')
 
     # Process each sensekit
     for sensekit in sensekits:
-        ros_port = sensekit.get("rosPort")
-        if ros_port is None:
-            print("Error: rosPort is required for sensekit configuration")
-            continue
+        process_kit(sensekit, 'sensekit')
 
-        # Generate the environment file for each sensekit
-        filename = f"{ros_port}.env"
-        write_env_file(f"{base_dir}/firmware_configs/sensekit", filename, sensekit, 'sensekit')
-
-        # Download the terminal script for this sensekit type
-        sensekit_type = sensekit.get("sensekitType")
-        if sensekit_type and sensekit_type not in downloaded_types:
-            # Define S3 file key and local path
-            s3_key = f"customer/terminal_{sensekit_type}.bash"
-            local_path = f"{base_dir}/extend_autostart/sensekit/terminal_{sensekit_type.lower()}.bash"
-
-            # Download from S3
-            download_file_from_s3(s3_client, s3_key, local_path)
-            downloaded_types.add(sensekit_type)  # Mark this type as downloaded
-
-        # Append the launcher command for this sensekit to firmware_launcher.bash
-        launcher_commands.append(
-            f"(source ${{HOME}}/firmware_configs/sensekit/{ros_port}.env && bash /home/extend/extend_autostart/sensekit/terminal_{sensekit_type.lower()}.bash)&"
-        )
 
     # Append commands to firmware_launcher.bash
     with open(f"{base_dir}/extend_autostart/firmware_launcher.bash", "a") as launcher_file:
