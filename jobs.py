@@ -220,7 +220,7 @@ def job_thread_fn(job_id, job_document):
         
         # Pass job_document to execute the job
         updateJobStatus(iotjobs.JobStatus.IN_PROGRESS)
-        success = execute.run_job(job_id, job_document)
+        success, status_message = execute.run_job(job_id, job_document)
 
         if success:
             print("Done working on job. Publishing request to update job status to SUCCEEDED...")
@@ -234,7 +234,8 @@ def job_thread_fn(job_id, job_document):
             request = iotjobs.UpdateJobExecutionRequest(
                 thing_name=jobs_thing_name,
                 job_id=job_id,
-                status=iotjobs.JobStatus.FAILED
+                status=iotjobs.JobStatus.FAILED,
+                # status_details
             )
         
         publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
