@@ -2,9 +2,7 @@ import subprocess
 import assumeRole
 import time
 import os
-import docker
 import boto3
-import base64
 import logging
 from pathlib import Path
 from enum import Enum
@@ -17,9 +15,8 @@ BASE_DIR = Path.home()
 FIRMWARE_CONFIG_DIR = BASE_DIR / "firmware_configs"
 EXTEND_AUTOSTART_DIR = BASE_DIR / "extend_autostart"
 IOT_KIT_DIR = BASE_DIR / ".iot_kit"
-IOT_LOGS_DIR = IOT_KIT_DIR / "logs"
 DEVICE_ENV_FILE = IOT_KIT_DIR / "device.env"
-JOBS_LOG_FILE = IOT_LOGS_DIR / "jobs.log"
+JOBS_LOG_FILE = IOT_KIT_DIR / "iot_jobs.log"
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 MAX_BACKUP_LOG_FILES = 5  # Limit to 5 backup log files
 
@@ -44,12 +41,12 @@ def manage_log_file():
         if JOBS_LOG_FILE.exists() and JOBS_LOG_FILE.stat().st_size > MAX_LOG_FILE_SIZE:
             # Rotate the log by renaming the current log file to a backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_log_file = IOT_LOGS_DIR / f"jobs_{timestamp}.log"
+            backup_log_file = IOT_KIT_DIR / f"iot_jobs_{timestamp}.log"
             JOBS_LOG_FILE.rename(backup_log_file)
             logging.info(f"Log file rotated. Old log saved as {backup_log_file}")
 
             # Clean up old log files if the number of backups exceeds the limit
-            backup_logs = sorted(IOT_LOGS_DIR.glob("jobs_*.log"), key=os.path.getmtime, reverse=True)
+            backup_logs = sorted(IOT_KIT_DIR.glob("iot_jobs_*.log"), key=os.path.getmtime, reverse=True)
             if len(backup_logs) > MAX_BACKUP_LOG_FILES:
                 for old_log in backup_logs[MAX_BACKUP_LOG_FILES:]:
                     try:
@@ -129,57 +126,53 @@ def handle_update_firmware(version, deleteOldImages):
         return False, "'region' or 'accountId' not found in device.env. Aborting job."
 
     ecr_repo = f"{account_id}.dkr.ecr.{ecr_region}.amazonaws.com"
-    image_name = f"{ecr_repo}/{DOCKER_IMAGE}:{version}"
 
     # Get temporary credentials for AWS ECR access
     credentials = assumeRole.get_temporary_credentials()
     if not credentials:
         return False, "Failed to retrieve temporary credentials. Aborting job."
 
-    # Initialize boto3 client to interact with ECR
+    # Authenticate Docker with AWS ECR by piping the AWS login password to Docker login
     try:
-        ecr_client = boto3.client(
-            'ecr',
-            region_name=ecr_region,
-            aws_access_key_id=credentials['aws_access_key_id'],
-            aws_secret_access_key=credentials['aws_secret_access_key'],
-            aws_session_token=credentials['aws_session_token']
-        )
+        # Step 1: Get the Docker login password from AWS ECR
+        login_password_command = [
+            "aws", "ecr", "get-login-password", "--region", ecr_region
+        ]
+        login_password_process = subprocess.run(login_password_command, capture_output=True, text=True, check=True)
+        login_password = login_password_process.stdout.strip()
 
-        # Get the ECR authorization token
-        response = ecr_client.get_authorization_token()
-        auth_data = response['authorizationData'][0]
-        token = base64.b64decode(auth_data['authorizationToken']).decode('utf-8')
-        username, password = token.split(':')
-
+        # Step 2: Use the retrieved password to log in to Docker
+        docker_login_command = [
+            "docker", "login", "--username", "AWS", "--password-stdin", ecr_repo
+        ]
+        login_process = subprocess.Popen(docker_login_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = login_process.communicate(input=login_password)
+        if login_process.returncode != 0:
+            logging.error(f"Failed to log in to ECR: {stderr.strip()}")
+            return False, f"Failed to log in to ECR: {stderr.strip()}"
+        else:
+            logging.info(f"Successfully logged in to ECR: {ecr_repo}")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error getting Docker login password: {e.stderr.strip()}")
+        return False, f"Error getting Docker login password: {e.stderr.strip()}"
     except Exception as e:
-        logging.error(f"Failed to obtain Docker login credentials from ECR: {e}")
-        return False, f"Failed to obtain Docker login credentials from ECR: {e}"
+        logging.error(f"Error during Docker login: {e}")
+        return False, f"Error during Docker login: {e}"
+    
+    # Pull the Docker image from the ECR repository
+    pull_command = [
+        "docker", "pull", f"{ecr_repo}/{DOCKER_IMAGE}:{version}"
+    ]
+    pull_success, pull_output = run_command(pull_command, "Pull Docker image")
+    if not pull_success:
+        return False, f"Failed to pull Docker image: {pull_output}"
 
-    # Initialize Docker client
-    client = docker.from_env()
-
-    # Authenticate Docker with AWS ECR using Docker SDK
-    try:
-        client.login(username=username, password=password, registry=ecr_repo)
-        logging.info(f"Successfully logged in to ECR: {ecr_repo}")
-    except docker.errors.APIError as e:
-        logging.error(f"Failed to log in to ECR: {str(e)}")
-        return False, f"Failed to log in to ECR: {str(e)}"
-
-    # Pull the Docker image from the ECR repository if it's not present
-    try:
-        client.images.pull(image_name)
-        logging.info(f"Successfully pulled Docker image {image_name}")
-    except docker.errors.APIError as e:
-        logging.error(f"Failed to pull Docker image: {str(e)}")
-        return False, f"Failed to pull Docker image: {str(e)}"
-
-    # Verify that the Docker image has been successfully pulled or already exists
-    try:
-        client.images.get(f"{DOCKER_IMAGE}:{version}")
-        logging.info(f"Docker image {DOCKER_IMAGE}:{version} already exists locally or has been updated successfully.")
-    except docker.errors.ImageNotFound:
+    # Verify that the Docker image has been successfully pulled
+    verify_command = [
+        "docker", "images", "-q", f"{DOCKER_IMAGE}:{version}"
+    ]
+    verify_success, verify_output = run_command(verify_command, "Verify Docker image")
+    if not verify_output.strip():
         return False, f"Error: Docker image {DOCKER_IMAGE}:{version} not found after pull."
 
     # Update the device.env file with the new firmware version
@@ -189,21 +182,27 @@ def handle_update_firmware(version, deleteOldImages):
 
     # Optionally remove old Docker images to free up space
     if deleteOldImages:
-        try:
-            images = client.images.list()
-            for img in images:
-                if DOCKER_IMAGE in img.tags and f":{version}" not in img.tags[0]:
-                    client.images.remove(image=img.id, force=True)
-                    logging.info(f"Old Docker image {img.tags[0]} removed.")
-        except docker.errors.APIError as e:
-            logging.error(f"Failed to remove old Docker images: {str(e)}")
+        cleanup_command = [
+            "docker", "images", "--format", "{{.ID}} {{.Repository}}:{{.Tag}}"
+        ]
+        cleanup_success, cleanup_output = run_command(cleanup_command, "List Docker images")
+        if cleanup_success:
+            images = [line.split()[0] for line in cleanup_output.splitlines() if f"{DOCKER_IMAGE}:{version}" not in line]
+            if images:
+                remove_command = ["docker", "rmi", "-f"] + images
+                remove_success, remove_output = run_command(remove_command, "Remove old Docker images")
+                if not remove_success:
+                    logging.error(f"Failed to remove old Docker images: {remove_output}")
+                else:
+                    logging.info("Old Docker images removed.")
 
     # Logout from AWS ECR to end the session
-    try:
-        client.logout(ecr_repo)
+    logout_command = ["docker", "logout", ecr_repo]
+    logout_success, logout_output = run_command(logout_command, "Logout from ECR")
+    if not logout_success:
+        logging.error(f"Failed to log out of ECR: {logout_output}")
+    else:
         logging.info("Logged out of ECR.")
-    except docker.errors.APIError as e:
-        logging.error(f"Failed to log out of ECR: {str(e)}")
 
     return True, "Firmware update completed successfully."
 
