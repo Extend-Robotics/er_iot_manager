@@ -133,6 +133,7 @@ def run_command(command_list, description=""):
 # This includes logging in to Docker, pulling images, and cleaning up old images if necessary
 def handle_update_firmware(version, deleteOldImages):
     if not version:
+        logging.error("Firmware version not specified.")
         return False, "Firmware version not specified."
 
     # Load necessary environment variables
@@ -141,6 +142,7 @@ def handle_update_firmware(version, deleteOldImages):
     account_id = env_vars.get("accountId")
 
     if not ecr_region or not account_id:
+        logging.error("'region' or 'accountId' not found in device.env. Aborting job.")
         return False, "'region' or 'accountId' not found in device.env. Aborting job."
 
     ecr_repo = f"{account_id}.dkr.ecr.{ecr_region}.amazonaws.com"
@@ -149,6 +151,7 @@ def handle_update_firmware(version, deleteOldImages):
     # Get temporary credentials for AWS ECR access
     credentials = assumeRole.get_temporary_credentials()
     if not credentials:
+        logging.error("Failed to retrieve temporary credentials. Aborting job.")
         return False, "Failed to retrieve temporary credentials. Aborting job."
 
     # Initialize boto3 client to interact with ECR
@@ -160,7 +163,8 @@ def handle_update_firmware(version, deleteOldImages):
             aws_secret_access_key=credentials['aws_secret_access_key'],
             aws_session_token=credentials['aws_session_token']
         )
-
+        logging.info("Successfully initialized ECR client.")
+        
         # Get the ECR authorization token
         response = ecr_client.get_authorization_token()
         auth_data = response['authorizationData'][0]
@@ -182,7 +186,7 @@ def handle_update_firmware(version, deleteOldImages):
         logging.error(f"Failed to log in to ECR: {str(e)}")
         return False, f"Failed to log in to ECR: {str(e)}"
 
-    # Pull the Docker image from the ECR repository if it's not present
+    # Pull the Docker image from the ECR repository
     try:
         client.images.pull(image_name)
         logging.info(f"Successfully pulled Docker image {image_name}")
@@ -195,11 +199,13 @@ def handle_update_firmware(version, deleteOldImages):
         client.images.get(f"{DOCKER_IMAGE}:{version}")
         logging.info(f"Docker image {DOCKER_IMAGE}:{version} already exists locally or has been updated successfully.")
     except docker.errors.ImageNotFound:
+        logging.error(f"Error: Docker image {DOCKER_IMAGE}:{version} not found after pull.")
         return False, f"Error: Docker image {DOCKER_IMAGE}:{version} not found after pull."
 
     # Update the device.env file with the new firmware version
     env_update_success, env_update_message = update_device_env(version)
     if not env_update_success:
+        logging.error(f"Failed to update device environment: {env_update_message}")
         return False, env_update_message
 
     # Optionally remove old Docker images to free up space
