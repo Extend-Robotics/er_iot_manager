@@ -31,7 +31,7 @@ python3 -m pip install $HOME/er_iot_manager
 
 source $HOME/.iot_kit/device.env
 
-# RUn the connection and jobs python scripts
+# Run the connection and jobs python scripts
 printf "\nRunning IoT manager application...\n"
 python3 $HOME/er_iot_manager/connection.py \
         --endpoint a34wwkbw0n00uf-ats.iot.eu-west-2.amazonaws.com \

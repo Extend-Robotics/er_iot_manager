@@ -29,6 +29,15 @@ class Actions(Enum):
     ADD_CONFIGS = 'ADD_CONFIGS'
     RUN_COMMAND = 'RUN_COMMAND'
 
+# Ensure the log directory exists
+if not IOT_LOGS_DIR.exists():
+    IOT_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Ensure the log file exists
+if not JOBS_LOG_FILE.exists():
+    with open(JOBS_LOG_FILE, 'w'):  # Create the log file if it doesn't exist
+        logging.info(f"Log file created: {JOBS_LOG_FILE}")
+
 # Configure logging to output to a file with detailed information, including timestamps
 logging.basicConfig(
     filename=JOBS_LOG_FILE,
@@ -36,6 +45,12 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+logging.debug("Test Debug message")
+logging.info("Test Info message")
+logging.warning("Test Warning message")
+logging.error("Test Error message")
+logging.critical("Test Critical message")
 
 # Function to manage log file size and rotate if necessary
 def manage_log_file():
