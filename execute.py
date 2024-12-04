@@ -258,8 +258,8 @@ def handle_add_configs(robokits, sensekits):
             # Download specific terminal script if not already downloaded
             kit_specific_type = kit.get(f"{kit_type}Type")
             if kit_specific_type and kit_specific_type not in downloaded_types:
-                s3_key = f"customer/terminal_{kit_specific_type}.bash"
-                local_path = EXTEND_AUTOSTART_DIR / kit_type / f"{kit_specific_type.lower()}.bash"
+                s3_key = f"customer/terminal_{kit_specific_type.lower()}.bash"
+                local_path = EXTEND_AUTOSTART_DIR / kit_type / f"terminal_{kit_specific_type.lower()}.bash"
                 if not download_file_from_s3(s3_client, s3_key, local_path):
                     return False
                 downloaded_types.add(kit_specific_type)
@@ -355,9 +355,11 @@ def run_job(job_id, job_document):
             logging.info("Job complete. Scheduling device to restart in 15 seconds.")
             subprocess.Popen(["nohup", "sh", "-c", "'sleep 15; shutdown -r now'"], shell=False)
             time.sleep(1)
+            return True, f"Job executed successfully. {message}. Your device will reboot in the next 30 seconds."
+
 
     except Exception as e:
         logging.error(f"Job execution failed: {e}")
         return False, f"Job execution failed: {e}"
     
-    return True, "Job executed successfully."
+    return True, f"Job executed successfully. {message}. You may require a reboot to see changes."

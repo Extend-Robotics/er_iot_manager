@@ -212,14 +212,14 @@ def on_start_next_pending_job_execution_rejected(rejected):
 
 def job_thread_fn(job_id, job_document):
     backend_url = "http://192.168.0.43:8080/api/jobs/status"  # Backend URL for notifying job status
-    def updateJobStatus(status):
-        requests.post(backend_url, json={"jobId": job_id, "status": status})
+    def updateJobStatus(status, status_message):
+        requests.post(backend_url, json={"jobId": job_id, "status": status, "statusDetails": status_message})
 
     try:
         print("Starting local work on job...")
         
         # Pass job_document to execute the job
-        updateJobStatus(iotjobs.JobStatus.IN_PROGRESS)
+        updateJobStatus(iotjobs.JobStatus.IN_PROGRESS, "Job execution has begun.")
         success, status_message = execute.run_job(job_id, job_document)
 
         if success:
@@ -227,7 +227,8 @@ def job_thread_fn(job_id, job_document):
             request = iotjobs.UpdateJobExecutionRequest(
                 thing_name=jobs_thing_name,
                 job_id=job_id,
-                status=iotjobs.JobStatus.SUCCEEDED
+                status=iotjobs.JobStatus.SUCCEEDED,
+                status_details={"message": status_message}
             )
         else:
             print("Job failed. Publishing request to update job status to FAILED...")
@@ -235,23 +236,25 @@ def job_thread_fn(job_id, job_document):
                 thing_name=jobs_thing_name,
                 job_id=job_id,
                 status=iotjobs.JobStatus.FAILED,
-                # status_details
+                status_details={"message": status_message}
             )
         
         publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
         publish_future.add_done_callback(on_publish_update_job_execution)
-        updateJobStatus(request.status)
+        updateJobStatus(request.status, status_message)
 
     except Exception as e:
         print(f"Exception in job_thread_fn: {e}")
         request = iotjobs.UpdateJobExecutionRequest(
             thing_name=jobs_thing_name,
             job_id=job_id,
-            status=iotjobs.JobStatus.FAILED
+            status=iotjobs.JobStatus.FAILED,
+            status_details={"message": 'Job Execution failed'}
+
         )
         publish_future = jobs_client.publish_update_job_execution(request, mqtt.QoS.AT_LEAST_ONCE)
         publish_future.add_done_callback(on_publish_update_job_execution)
-        updateJobStatus(request.status)
+        updateJobStatus(request.status, 'Job Execution failed due to an internal error. Contact Extend Robotics for support.')
     
 
 def on_publish_update_job_execution(future):
