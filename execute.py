@@ -46,12 +46,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-logging.debug("Test Debug message")
-logging.info("Test Info message")
-logging.warning("Test Warning message")
-logging.error("Test Error message")
-logging.critical("Test Critical message")
-
 # Function to manage log file size and rotate if necessary
 def manage_log_file():
     try:
@@ -190,9 +184,17 @@ def handle_update_firmware(version, deleteOldImages):
     try:
         client.images.pull(image_name)
         logging.info(f"Successfully pulled Docker image {image_name}")
+
+        # Retag the Docker image from the ECR repository
+        image = client.images.get(image_name)
+        image.tag(f"{DOCKER_IMAGE}:{version}")
+        logging.info(f"Successfully retagged Docker image {image_name}")
     except docker.errors.APIError as e:
         logging.error(f"Failed to pull Docker image: {str(e)}")
         return False, f"Failed to pull Docker image: {str(e)}"
+    except docker.errors.ImageNotFound as e:
+        logging.error(f"Image {image_name} not found: {str(e)}")
+        return False, f"Image {image_name} not found: {str(e)}"
 
     # Verify that the Docker image has been successfully pulled or already exists
     try:
@@ -218,13 +220,6 @@ def handle_update_firmware(version, deleteOldImages):
                     logging.info(f"Old Docker image {img.tags[0]} removed.")
         except docker.errors.APIError as e:
             logging.error(f"Failed to remove old Docker images: {str(e)}")
-
-    # Logout from AWS ECR to end the session
-    try:
-        client.logout(ecr_repo)
-        logging.info("Logged out of ECR.")
-    except docker.errors.APIError as e:
-        logging.error(f"Failed to log out of ECR: {str(e)}")
 
     return True, "Firmware update completed successfully."
 
