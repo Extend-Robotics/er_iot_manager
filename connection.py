@@ -1,18 +1,22 @@
 import sys
 import signal
-from awscrt import mqtt
-from awsiot import mqtt_connection_builder
 import requests
-from utils.command_line_utils import CommandLineUtils
 import time
 import threading
 import subprocess
 import os
+from pathlib import Path
+from awscrt import mqtt
+from awsiot import mqtt_connection_builder
+from utils.command_line_utils import CommandLineUtils
 
-backend_url = "http://192.168.0.43:8080/api"  # Backend URL for notifying connection status
+BASE_DIR = Path.home()
+IOT_MANAGER_DIR = BASE_DIR / "er_iot_manager"
+JOBS_SCRIPT_FILE = IOT_MANAGER_DIR / "jobs.py"
+BACKEND_URL = "http://192.168.0.43:8080/api"  # Backend URL for notifying connection status
 
 # Set the backend URL environment variable (e.g., set to production or development URL)
-os.environ['BACKEND_URL'] = backend_url  # Change as needed
+os.environ['BACKEND_URL'] = BACKEND_URL  # Change as needed
 
 # Parse command-line arguments
 # cmdData will hold parsed values for various required inputs (e.g., endpoint, certs, keys, etc.)
@@ -46,7 +50,7 @@ def notify_backend(status):
     while True:
         try:
             print(f"Attempting to notify backend with status: {status}")  # Debugging log
-            response = requests.post(f"{backend_url}/devices/status", json=payload)  # Send status update to backend
+            response = requests.post(f"{BACKEND_URL}/devices/status", json=payload)  # Send status update to backend
             response.raise_for_status()  # Raise an error if the response contains an HTTP error status code
             # Status update was successful
             print("Successfully notified backend.")  # Debugging log
@@ -93,11 +97,11 @@ def handle_termination(signum, frame):
 # Register the signal handler for termination
 signal.signal(signal.SIGTERM, handle_termination)
 
-# Function to run another script in parallel
+# Function to run jobs script
 def run_external_script():
-    print("Starting external script...")  # Debugging log
+    print("Starting jobs script...")  # Debugging log
     # Run the external Python script asynchronously with the same parameters
-    subprocess.Popen(["python3", "other_script.py", \
+    subprocess.Popen(["python3", JOBS_SCRIPT_FILE, \
                       "--endpoint", cmdData.input_endpoint, \
                       "--key", cmdData.input_key, \
                       "--cert", cmdData.input_cert, \

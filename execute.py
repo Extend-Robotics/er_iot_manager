@@ -1,5 +1,4 @@
 import subprocess
-import assumeRole
 import time
 import os
 import docker
@@ -382,7 +381,7 @@ def handle_add_configs(robokits, sensekits):
     # Append generated commands to firmware_launcher.bash
     try:
         with (EXTEND_AUTOSTART_DIR / "firmware_launcher.bash").open("a") as launcher_file:
-            launcher_file.write("\n\n".join(launcher_commands) + "\n")
+            launcher_file.write("\n\n" + "\n\n".join(launcher_commands) + "\n")
         (EXTEND_AUTOSTART_DIR / "firmware_launcher.bash").chmod(0o755)
         logging.info("firmware_launcher.bash has been updated and made executable.")
     except Exception as e:
