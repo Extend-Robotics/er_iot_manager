@@ -8,7 +8,8 @@ setup(
     install_requires=[
         "boto3",
         "awsiotsdk",
-        "python-dotenv"
+        "python-dotenv",
+        "docker",
     ],
     python_requires='>=3.6',
 )
