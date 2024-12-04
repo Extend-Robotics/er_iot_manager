@@ -211,9 +211,10 @@ def on_start_next_pending_job_execution_rejected(rejected):
 
 
 def job_thread_fn(job_id, job_document):
-    backend_url = "http://192.168.0.43:8080/api/jobs/status"  # Backend URL for notifying job status
+    # Set backend URL from environment variable, defaulting to DEV URL if not provided
+    backend_url = os.getenv('BACKEND_URL')
     def updateJobStatus(status, status_message):
-        requests.post(backend_url, json={"jobId": job_id, "status": status, "statusDetails": status_message})
+        requests.post(f"{backend_url}/jobs/status", json={"jobId": job_id, "status": status, "statusDetails": status_message})
 
     try:
         print("Starting local work on job...")

@@ -5,92 +5,136 @@ from awsiot import mqtt_connection_builder
 import requests
 from utils.command_line_utils import CommandLineUtils
 import time
+import threading
+import subprocess
+import os
+
+backend_url = "http://192.168.0.43:8080/api"  # Backend URL for notifying connection status
+
+# Set the backend URL environment variable (e.g., set to production or development URL)
+os.environ['BACKEND_URL'] = backend_url  # Change as needed
 
 # Parse command-line arguments
+# cmdData will hold parsed values for various required inputs (e.g., endpoint, certs, keys, etc.)
 cmdData = CommandLineUtils.parse_sample_input_jobs()
+print("Parsed command line arguments.")  # Debugging log
 
 # AWS IoT Core connection parameters from command-line arguments
+# Creating an MQTT connection using the provided certificate and key paths, endpoint, client ID, etc.
+print("Creating MQTT connection...")  # Debugging log
 mqtt_connection = mqtt_connection_builder.mtls_from_path(
-    endpoint=cmdData.input_endpoint,
-    port=cmdData.input_port,
-    cert_filepath=cmdData.input_cert,
-    pri_key_filepath=cmdData.input_key,
-    ca_filepath=cmdData.input_ca,
-    client_id=cmdData.input_clientId,
-    clean_session=False,
-    keep_alive_secs=30
+    endpoint=cmdData.input_endpoint,  # The AWS IoT endpoint
+    port=cmdData.input_port,  # Port for MQTT connection (usually 8883 for secure MQTT)
+    cert_filepath=cmdData.input_cert,  # Path to the client certificate
+    pri_key_filepath=cmdData.input_key,  # Path to the private key
+    ca_filepath=cmdData.input_ca,  # Path to the CA certificate
+    client_id=cmdData.input_clientId,  # Client ID used for connecting (must be unique per device)
+    clean_session=False,  # Set to False to persist session across multiple connections
+    keep_alive_secs=30  # Keep-alive interval for MQTT connection
 )
+print("MQTT connection created.")  # Debugging log
 
-thing_name = cmdData.input_thing_name  # Unique identifier for the device, e.g., the thing_name or client_id
-backend_url = "http://192.168.0.43:8080/api/devices/status"  # Backend URL for notifying connection status
+# The unique identifier for the device; this is typically the "thing name" in AWS IoT
+thing_name = cmdData.input_thing_name
+# Default connection status
 connection_status = "Disconnected"
 
-
-def notify_backend(status, retries=5, backoff_factor=1):
-    attempt = 0
-    payload = {"thingName": thing_name, "status": status}
-    while True:  # Infinite retry loop
+# Function to notify backend of device connection status
+def notify_backend(status):
+    payload = {"thingName": thing_name, "status": status}  # Payload to send to backend
+    start_time = time.time()  # Record the start time
+    while True:
         try:
-            response = requests.post(backend_url, json=payload)
-            response.raise_for_status()
-            # print(f"Status updated to {status} for device {thing_id}")
+            print(f"Attempting to notify backend with status: {status}")  # Debugging log
+            response = requests.post(f"{backend_url}/devices/status", json=payload)  # Send status update to backend
+            response.raise_for_status()  # Raise an error if the response contains an HTTP error status code
+            # Status update was successful
+            print("Successfully notified backend.")  # Debugging log
             return True
         except requests.exceptions.RequestException as e:
+            # Log the failure and retry every 10 seconds until 24 hours have passed
             print(f"Failed to update status: {e}")
-            attempt += 1
-            time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
-            # Optionally, you could set a limit to prevent infinite retries under certain conditions
-            # if attempt > some_threshold:
-            #     print("Max attempts reached, giving up.")
-            #     break
-
+            if time.time() - start_time > 86400:  # 86400 seconds = 24 hours
+                print("Failed to update status for 24 hours. Giving up.")
+                return False
+            print("Retrying to notify backend in 10 seconds...")  # Debugging log
+            time.sleep(10)  # Retry every 10 seconds
 
 # Callback for connection interruptions (e.g., internet outage)
 def on_connection_interrupted(connection, error, **kwargs):
     global connection_status
     if connection_status != "Disconnected":
-        print(f"Connection interrupted for device {thing_name}. Error:", error)
+        # Log the connection interruption and notify backend
+        print(f"Connection interrupted for device {thing_name}. Error: {error}")  # Debugging log
         connection_status = "Disconnected"
         notify_backend(connection_status)
 
 # Callback for connection resumptions
 def on_connection_resumed(connection, return_code, session_present, **kwargs):
     global connection_status
+    # If the connection was successfully resumed, update the connection status
     if return_code == mqtt.ConnectReturnCode.ACCEPTED and connection_status != "Connected":
-        print(f"Connection resumed for for device {thing_name}")
+        print(f"Connection resumed for device {thing_name}")  # Debugging log
         connection_status = "Connected"
         notify_backend(connection_status)
 
+# Function to handle termination signals (e.g., SIGTERM)
 def handle_termination(signum, frame):
-    print("Termination signal recieved. Cleaning up...")
+    print("Termination signal received. Cleaning up...")  # Debugging log
+    # Disconnect MQTT connection gracefully
     disconnect_future = mqtt_connection.disconnect()
-    disconnect_future.result()
+    print("Waiting for MQTT disconnection to complete...")  # Debugging log
+    disconnect_future.result()  # Wait for the disconnect to complete
+    # Notify backend that the device is disconnected
     notify_backend("Disconnected")
-    print("Disconnected!")
+    print("Disconnected!")  # Debugging log
     sys.exit(0)
 
+# Register the signal handler for termination
 signal.signal(signal.SIGTERM, handle_termination)
 
-# Connect to AWS IoT Core
-print(f"Connecting to {cmdData.input_endpoint} with client ID {thing_name}...")
-connect_future = mqtt_connection.connect()
-connect_future.result()
-connection_status = "Connected"
-notify_backend(connection_status)
-print("Connected!")
+# Function to run another script in parallel
+def run_external_script():
+    print("Starting external script...")  # Debugging log
+    # Run the external Python script asynchronously with the same parameters
+    subprocess.Popen(["python3", "other_script.py", \
+                      "--endpoint", cmdData.input_endpoint, \
+                      "--key", cmdData.input_key, \
+                      "--cert", cmdData.input_cert, \
+                      "--thing_name", thing_name, \
+                      "--ca_file", cmdData.input_ca])  
 
-# Send heartbeat every 5 seconds
+# Start the external script in a separate thread
+external_script_thread = threading.Thread(target=run_external_script)
+external_script_thread.start()
+
+# Connect to AWS IoT Core
+print(f"Connecting to {cmdData.input_endpoint} with client ID {thing_name}...")  # Debugging log
+connect_future = mqtt_connection.connect()  # Initiate the connection
+print("Waiting for MQTT connection to complete...")  # Debugging log
+connect_future.result()  # Wait for the connection to complete
+connection_status = "Connected"
+print("Successfully connected to AWS IoT Core.")  # Debugging log
+notify_backend(connection_status)  # Notify backend that the device is now connected
+print("Connected!")  # Debugging log
+
+# Send heartbeat every 5 seconds to notify backend of connection status
 try:
     while True:
         if connection_status == "Connected":
+            print("Sending heartbeat to backend...")  # Debugging log
             if not notify_backend("Connected"):
-                # If unable to notify backend, assume disconnected and retry
+                # If unable to notify backend after 24 hours, assume disconnected and stop trying
+                print("Failed to notify backend after 24 hours. Assuming disconnected.")  # Debugging log
                 connection_status = "Disconnected"
-        time.sleep(5)
+        time.sleep(5)  # Wait for 5 seconds before sending the next heartbeat
 except KeyboardInterrupt:
-    print("Disconnecting...")
+    # Handle user interruption (e.g., Ctrl+C)
+    print("Keyboard interrupt received. Disconnecting...")  # Debugging log
 finally:
+    # Ensure the MQTT connection is disconnected gracefully
+    print("Ensuring graceful MQTT disconnection...")  # Debugging log
     disconnect_future = mqtt_connection.disconnect()
-    disconnect_future.result()
-    notify_backend("Disconnected")
-    print("Disconnected!")
+    disconnect_future.result()  # Wait for the disconnect to complete
+    notify_backend("Disconnected")  # Notify backend of disconnection
+    print("Disconnected!")  # Debugging log

@@ -6,6 +6,7 @@ import docker
 import boto3
 import base64
 import logging
+import requests
 from pathlib import Path
 from enum import Enum
 from datetime import datetime
@@ -20,6 +21,9 @@ IOT_KIT_DIR = BASE_DIR / ".iot_kit"
 IOT_LOGS_DIR = IOT_KIT_DIR / "logs"
 DEVICE_ENV_FILE = IOT_KIT_DIR / "device.env"
 JOBS_LOG_FILE = IOT_LOGS_DIR / "jobs.log"
+CREDENTIAL_PROVIDER_ENDPOINT = "https://c1yqqljqzvtfa.credentials.iot.eu-west-2.amazonaws.com"
+DEVICE_ROLE_ALIAS = "ClientDevicesRoleAlias"
+CREDENTIAL_URL = f"{CREDENTIAL_PROVIDER_ENDPOINT}/role-aliases/{DEVICE_ROLE_ALIAS}/credentials"
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 MAX_BACKUP_LOG_FILES = 5  # Limit to 5 backup log files
 
@@ -45,6 +49,39 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+def get_temporary_credentials():
+    """Retrieves temporary credentials from AWS IoT Credential Provider and configures AWS CLI."""
+    try:
+        cert_path = os.getenv('CERT_FILE_PATH')
+        key_path = os.getenv('PRIVATE_KEY_PATH')
+        root_ca_path = os.getenv('ROOT_CA_PATH')
+
+        response = requests.get(
+            CREDENTIAL_URL,
+            cert=(cert_path, key_path),
+            verify=root_ca_path
+        )
+        
+        if response.status_code == 200:
+            credentials = response.json()["credentials"]
+            
+            # Configure AWS CLI with temporary credentials
+            aws_access_key = credentials["accessKeyId"]
+            aws_secret_key = credentials["secretAccessKey"]
+            aws_session_token = credentials["sessionToken"]
+                        
+            return {
+                "aws_access_key_id": aws_access_key,
+                "aws_secret_access_key": aws_secret_key,
+                "aws_session_token": aws_session_token
+            }
+        else:
+            print("Failed to retrieve credentials:", response.text)
+            return None
+    except Exception as e:
+        print(f"Error getting credentials: {e}")
+        return None
 
 # Function to manage log file size and rotate if necessary
 def manage_log_file():
@@ -152,7 +189,7 @@ def handle_update_firmware(version, deleteOldImages):
     image_name = f"{ecr_repo}/{DOCKER_IMAGE}:{version}"
 
     # Get temporary credentials for AWS ECR access
-    credentials = assumeRole.get_temporary_credentials()
+    credentials = get_temporary_credentials()
     if not credentials:
         logging.error("Failed to retrieve temporary credentials. Aborting job.")
         return False, "Failed to retrieve temporary credentials. Aborting job."
@@ -247,7 +284,7 @@ def download_file_from_s3(s3_client, file_key, local_path):
 
 # Function to handle adding configurations, including downloading necessary files and generating environment configs
 def handle_add_configs(robokits, sensekits):
-    credentials = assumeRole.get_temporary_credentials()
+    credentials = get_temporary_credentials()
     if not credentials:
         return False, "Failed to retrieve temporary credentials. Aborting."
     
