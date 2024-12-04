@@ -114,14 +114,23 @@ def update_device_env(new_version):
 
 # Utility function to run shell commands and handle errors
 # Instead of using shell=True, we pass the command as a list for security and reliability
-def run_command(command_list, description=""):
+def run_command(command_list, use_shell=False):
     try:
-        result = subprocess.run(command_list, capture_output=True, text=True, check=True)
-        logging.info(f"{description} - Command output: {result.stdout.strip()}")
-        return True, result.stdout.strip()
+        # Determine if shell should be used
+        if use_shell:
+            result = subprocess.run(" ".join(command_list), shell=True, check=True, capture_output=True, text=True)
+        else:
+            result = subprocess.run(command_list, check=True, capture_output=True, text=True)
+        
+        logging.info(f"Command output: {result.stdout.strip()}")
+        return True, f"Command output: {result.stdout.strip()}"
     except subprocess.CalledProcessError as e:
-        logging.error(f"{description} - Command failed with error: {e.stderr.strip()}")
-        return False, e.stderr.strip()
+        logging.error(f"Command failed with error: {e.stderr.strip()}")
+        return False, f"Command failed with error: {e.stderr.strip()}"
+    except Exception as e:
+        logging.error(f"Command failed with error: {e.stderr.strip()}")
+        return False, f"Command failed with error: {e.stderr.strip()}"
+
 
 # Function to handle the firmware update process, including Docker operations
 # This includes logging in to Docker, pulling images, and cleaning up old images if necessary
@@ -348,12 +357,14 @@ def handle_add_configs(robokits, sensekits):
 # Function to handle running a command provided in the job document
 def handle_run_command(command):
     if command:
-        run_success, run_output = run_command(command.split(), "Executing provided command")
+        # Pass command to `run_command` and specify that shell should be used for redirection
+        run_success, run_output = run_command(command.split(), use_shell=True)
         if run_success:
             return True, "Command executed successfully."
         else:
             return False, f"Command failed: {run_output}"
     else:
+        logging.error("No command specified.")
         return False, "No command specified."
 
 # Main function to execute a job, which may consist of multiple steps
