@@ -207,7 +207,10 @@ def handle_update_firmware(version, deleteOldImages):
         # Get the ECR authorization token
         response = ecr_client.get_authorization_token()
         auth_data = response['authorizationData'][0]
-        token = base64.b64decode(auth_data['authorizationToken']).decode('utf-8')
+        proxy_endpoint = auth_data['proxyEndpoint']
+        proxy_endpoint_without_https = proxy_endpoint.replace("https://", "") # Remove the 'https://' prefix from the proxy endpoint
+        authorization_token = auth_data['authorizationToken']
+        token = base64.b64decode(authorization_token).decode('utf-8')
         username, password = token.split(':')
 
     except Exception as e:
@@ -219,7 +222,7 @@ def handle_update_firmware(version, deleteOldImages):
 
     # Authenticate Docker with AWS ECR using Docker SDK
     try:
-        client.login(username=username, password=password, registry=ecr_repo)
+        client.login(username=username, password=password, registry=proxy_endpoint_without_https)
         logging.info(f"Successfully logged in to ECR: {ecr_repo}")
     except docker.errors.APIError as e:
         logging.error(f"Failed to log in to ECR: {str(e)}")
