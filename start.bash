@@ -2,10 +2,24 @@
 # stop script on error
 set -e
 
+# Wait for network to be available
+printf "\nWaiting for network to be available...\n"
+while ! ping -c 1 -W 1 8.8.8.8 &> /dev/null; do
+  sleep 2
+done
+printf "\nNetwork is available. Proceeding...\n"
+
 # Check for python 3
 if ! python3 --version &> /dev/null; then
   printf "\nERROR: python3 must be installed.\n"
   exit 1
+fi
+
+# Check for pip
+if ! python3 -m pip --version &> /dev/null; then
+  printf "\nInstalling pip for Python 3 on Ubuntu...\n"
+  sudo apt update
+  sudo apt install -y python3-pip
 fi
 
 # Check to see if root CA file exists, download if not
@@ -39,4 +53,3 @@ python3 $HOME/er_iot_manager/connection.py \
         --cert $HOME/.iot_kit/$thingName.cert.pem \
         --thing_name $thingName \
         --ca_file $HOME/.iot_kit/root-CA.crt
-
