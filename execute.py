@@ -449,7 +449,7 @@ def run_job(job_id, job_document):
         # Schedule a reboot if specified in the job document
         if reboot_after_job:
             logging.info("Job complete. Scheduling device to restart in 15 seconds.")
-            subprocess.Popen(["nohup", "sh", "-c", "sleep 15; shutdown -r now &"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen("nohup sh -c 'sleep 15; shutdown -r now' &", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(1)
             return True, f"Job executed successfully. {message}. Your device will reboot in the next 30 seconds."
 
