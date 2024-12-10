@@ -32,23 +32,6 @@ class Actions(Enum):
     ADD_CONFIGS = 'ADD_CONFIGS'
     RUN_COMMAND = 'RUN_COMMAND'
 
-# Ensure the log directory exists
-if not IOT_LOGS_DIR.exists():
-    IOT_LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Ensure the log file exists
-if not JOBS_LOG_FILE.exists():
-    with open(JOBS_LOG_FILE, 'w'):  # Create the log file if it doesn't exist
-        logging.info(f"Log file created: {JOBS_LOG_FILE}")
-
-# Configure logging to output to a file with detailed information, including timestamps
-logging.basicConfig(
-    filename=JOBS_LOG_FILE,
-    level=logging.DEBUG,
-    format='%(asctime)s %(levelname)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
 def get_temporary_credentials():
     """Retrieves temporary credentials from AWS IoT Credential Provider and configures AWS CLI."""
     try:
@@ -409,6 +392,23 @@ def handle_run_command(command):
 # Main function to execute a job, which may consist of multiple steps
 def run_job(job_id, job_document):
     try:
+        # Ensure the log directory exists
+        if not IOT_LOGS_DIR.exists():
+            IOT_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Ensure the log file exists
+        if not JOBS_LOG_FILE.exists():
+            with open(JOBS_LOG_FILE, 'w'):  # Create the log file if it doesn't exist
+                logging.info(f"Log file created: {JOBS_LOG_FILE}")
+
+        # Configure logging to output to a file with detailed information, including timestamps
+        logging.basicConfig(
+            filename=JOBS_LOG_FILE,
+            level=logging.DEBUG,
+            format='%(asctime)s %(levelname)s: %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
         # Manage the log file size before starting the job
         manage_log_file()
 
