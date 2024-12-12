@@ -231,6 +231,13 @@ def handle_update_firmware(version, deleteOldImages):
     try:
         client.images.get(f"{DOCKER_IMAGE}:{version}")
         logging.info(f"Docker image {DOCKER_IMAGE}:{version} already exists locally or has been updated successfully.")
+
+        # Remove the original image now that the tagged version is confirmed
+        try:
+            client.images.remove(image_name)
+            logging.info(f"Successfully untagged original Docker image {image_name} after tagging.")
+        except docker.errors.APIError as e:
+            logging.warning(f"Failed to untag original Docker image {image_name}: {str(e)}")
     except docker.errors.ImageNotFound:
         logging.error(f"Error: Docker image {DOCKER_IMAGE}:{version} not found after pull.")
         return False, f"Error: Docker image {DOCKER_IMAGE}:{version} not found after pull."
@@ -244,6 +251,16 @@ def handle_update_firmware(version, deleteOldImages):
     # Optionally remove old Docker images to free up space
     if deleteOldImages:
         try:
+            # Stop and remove all running containers before executing the main code
+            try:
+                containers = client.containers.list()
+                for container in containers:
+                    container.stop()
+                    container.remove()
+                logging.info("Successfully stopped and removed all running containers.")
+            except docker.errors.APIError as e:
+                logging.error(f"Failed to stop or remove containers: {str(e)}")
+                return False, f"Failed to stop or remove containers: {str(e)}"
             images = client.images.list()
             for img in images:
                 if DOCKER_IMAGE in img.tags and f":{version}" not in img.tags[0]:
@@ -419,17 +436,17 @@ def run_job(job_id, job_document):
         # Iterate through each step in the job document
         for step in steps:
             action = step.get("action")
+            parameters = step.get("parameters", {})
 
             if action == Actions.UPDATE_FIRMWARE.value:
-                version = step.get("parameters", {}).get("firmwareVersion")
-                deleteOldImages = step.get("parameters", {}).get("deleteOldImages")
+                version = parameters.get("firmwareVersion")
+                deleteOldImages = parameters.get("deleteOldImages")
                 success, message = handle_update_firmware(version, deleteOldImages)
                 if not success:
                     return False, message
 
             elif action == Actions.ADD_CONFIGS.value:
                 # Extract robokits and sensekits from parameters in the step
-                parameters = step.get("parameters", {})
                 robokits = parameters.get("robokits", [])
                 sensekits = parameters.get("sensekits", [])
                 # Call add_configs with robokits and sensekits
@@ -438,7 +455,7 @@ def run_job(job_id, job_document):
                     return False, message
 
             elif action == Actions.RUN_COMMAND.value:
-                command = step.get("parameters", {}).get("command")
+                command = parameters.get("command")
                 success, message = handle_run_command(command)
                 if not success:
                     return False, message
@@ -451,7 +468,7 @@ def run_job(job_id, job_document):
             logging.info("Job complete. Scheduling device to restart in 15 seconds.")
             subprocess.Popen("nohup sh -c 'sleep 15; shutdown -r now' &", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(1)
-            return True, f"Job executed successfully. {message}. Your device will reboot in the next 30 seconds."
+            return True, f"Job executed successfully. {message} Your device will reboot in the next 30 seconds."
 
 
     except Exception as e:
