@@ -469,13 +469,8 @@ def run_job(job_id, job_document):
         # Schedule a reboot if specified in the job document
         if reboot_after_job:
             logging.info("Job complete. Scheduling device to restart in 15 seconds.")
-
             try:
-                process = subprocess.Popen(
-                    ["/bin/sh", "-c", "sleep 15; reboot"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+                process = subprocess.Popen("/bin/sh -c 'sleep 15; echo extend | sudo -S reboot'", shell=True)
                 stdout, stderr = process.communicate(timeout=20)  # Adjust timeout as needed
                 if process.returncode == 0:
                     logging.info("Reboot command executed successfully.")
