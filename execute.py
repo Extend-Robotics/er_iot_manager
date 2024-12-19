@@ -472,7 +472,7 @@ def run_job(job_id, job_document):
 
             try:
                 process = subprocess.Popen(
-                    ["/bin/sh", "-c", "sleep 15; shutdown -r now"],
+                    ["/bin/sh", "-c", "sleep 15; reboot"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
