@@ -13,7 +13,7 @@ from utils.command_line_utils import CommandLineUtils
 BASE_DIR = Path.home()
 IOT_MANAGER_DIR = BASE_DIR / "er_iot_manager"
 JOBS_SCRIPT_FILE = IOT_MANAGER_DIR / "jobs.py"
-BACKEND_URL = "http://192.168.0.43:8080/api"  # Backend URL for notifying connection status
+BACKEND_URL = "https://api.extendrobotics.com"  # Backend URL for notifying connection status
 
 # Set the backend URL environment variable (e.g., set to production or development URL)
 os.environ['BACKEND_URL'] = BACKEND_URL  # Change as needed
