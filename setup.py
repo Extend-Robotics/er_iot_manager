@@ -6,7 +6,7 @@ setup(
     description="IoT device setup with AWS IoT SDK and boto3",
     packages=find_packages(),
     install_requires=[
-        "urllib3>=1.25.4,<1.27",
+        "urllib3>=1.26.0,<1.27",
         "pyyaml",
         "boto3",
         "awsiotsdk",
