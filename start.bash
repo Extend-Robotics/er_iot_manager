@@ -2,12 +2,32 @@
 # stop script on error
 set -e
 
+LOG_FILE="/tmp/extend_iot_start.log"
+
+# Redirect stdout and stderr through tee to log file and terminal
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 # Wait for network to be available
 printf "\nWaiting for network to be available...\n"
 while ! ping -c 1 -W 1 8.8.8.8 &> /dev/null; do
   sleep 2
 done
 printf "\nNetwork is available. Proceeding...\n"
+
+if ping -q -c1 -W1 google.com >/dev/null && command -v chronyc >/dev/null 2>&1; then
+    while true; do
+        refid=$(chronyc tracking | grep "Reference ID" | awk '{print $5}')
+        leap=$(chronyc tracking | grep "Leap status" | awk '{print $4}')
+        
+        if [ "$refid" != "()" ] && [ "$leap" = "Normal" ]; then
+            echo "Chrony is synchronized."
+            break
+        else
+            echo "Waiting for chrony to synchronize..."
+            sleep 0.5
+        fi
+    done
+fi
 
 # Check for python 3
 if ! python3 --version &> /dev/null; then
