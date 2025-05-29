@@ -68,9 +68,23 @@ source $HOME/.iot_kit/device.env
 
 # Run the connection and jobs python scripts
 printf "\nRunning IoT manager application...\n"
-python3 $HOME/er_iot_manager/connection.pyc \
-        --endpoint a34wwkbw0n00uf-ats.iot.eu-west-2.amazonaws.com \
-        --key $HOME/.iot_kit/$thingName.private.key \
-        --cert $HOME/.iot_kit/$thingName.cert.pem \
-        --thing_name $thingName \
-        --ca_file $HOME/.iot_kit/root-CA.crt
+
+# Define the base directory and connection script path
+CONNECTION_SCRIPT_DIR="$HOME/er_iot_manager"
+CONNECTION_SCRIPT="$CONNECTION_SCRIPT_DIR/connection.py"
+CONNECTION_SCRIPT_PYC="$CONNECTION_SCRIPT_DIR/connection.pyc"
+
+# Choose the correct script (source or compiled)
+if [ -f "$CONNECTION_SCRIPT" ]; then
+  SCRIPT_TO_RUN="$CONNECTION_SCRIPT"
+else
+  SCRIPT_TO_RUN="$CONNECTION_SCRIPT_PYC"
+fi
+
+# Run the chosen script
+python3 "$SCRIPT_TO_RUN" \
+  --endpoint a34wwkbw0n00uf-ats.iot.eu-west-2.amazonaws.com \
+  --key "$HOME/.iot_kit/$thingName.private.key" \
+  --cert "$HOME/.iot_kit/$thingName.cert.pem" \
+  --thing_name "$thingName" \
+  --ca_file "$HOME/.iot_kit/root-CA.crt"
