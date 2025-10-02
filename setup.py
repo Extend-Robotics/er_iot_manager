@@ -13,5 +13,5 @@ setup(
         "python-dotenv",
         "docker",
     ],
-    python_requires=">=3.8.10,<=3.10.12",
+    python_requires=">=3.8.10,<=3.10.18",
 )
