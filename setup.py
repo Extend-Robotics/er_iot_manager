@@ -13,5 +13,10 @@ setup(
         "python-dotenv",
         "docker",
     ],
+    extras_require={
+        "dev": [
+            "black",
+        ],
+    },
     python_requires=">=3.8.10,<=3.10.18",
 )
