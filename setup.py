@@ -12,6 +12,7 @@ setup(
         "awsiotsdk",
         "python-dotenv",
         "docker",
+        "cryptography>=41.0.0",
     ],
     extras_require={
         "dev": [
