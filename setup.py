@@ -19,5 +19,5 @@ setup(
             "black",
         ],
     },
-    python_requires=">=3.8.10,<=3.10.18",
+    python_requires=">=3.8.10,<3.11",
 )
