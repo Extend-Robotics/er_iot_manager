@@ -35,10 +35,17 @@ if ! python3 --version &> /dev/null; then
   exit 1
 fi
 
-# Check for pip
+# Check for pip, install if missing (with version-specific bootstrap)
 if ! python3 -m pip --version &> /dev/null; then
-  printf "\nInstalling pip for Python 3.8...\n"
-  curl -s https://bootstrap.pypa.io/pip/3.8/get-pip.py -o /tmp/get-pip.py
+  PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+  printf "\nInstalling pip for Python $PYTHON_VERSION...\n"
+  
+  if [ "$PYTHON_VERSION" = "3.8" ]; then
+    curl -s https://bootstrap.pypa.io/pip/3.8/get-pip.py -o /tmp/get-pip.py
+  else
+    curl -s https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+  fi
+  
   python3 /tmp/get-pip.py --user
 fi
 
@@ -84,7 +91,7 @@ fi
 
 # Run the setup script to install required dependencies using setup.py
 printf "\nRunning setup.py to install dependencies for er_iot_manager...\n"
-pip3 install $HOME/er_iot_manager  # Uses venv's pip since it's activated
+pip install $HOME/er_iot_manager  # Uses venv's pip since it's activated
 
 source $HOME/.iot_kit/device.env
 
