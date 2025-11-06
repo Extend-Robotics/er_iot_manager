@@ -13,6 +13,7 @@ setup(
         "python-dotenv",
         "docker",
         "cryptography>=41.0.0",
+        "pyopenssl>=22.0.0"
     ],
     extras_require={
         "dev": [
