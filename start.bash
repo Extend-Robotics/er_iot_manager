@@ -37,10 +37,32 @@ fi
 
 # Check for pip
 if ! python3 -m pip --version &> /dev/null; then
-  printf "\nInstalling pip for Python 3 on Ubuntu...\n"
-  sudo apt update
-  sudo apt install -y python3-pip
+  printf "\nInstalling pip for Python 3.8...\n"
+  curl -s https://bootstrap.pypa.io/pip/3.8/get-pip.py -o /tmp/get-pip.py
+  python3 /tmp/get-pip.py --user
 fi
+
+# Install virtualenv to user directory if not already installed
+if ! $HOME/.local/bin/pip3 show virtualenv &> /dev/null; then
+    echo "Installing virtualenv..."
+    $HOME/.local/bin/pip3 install virtualenv --user
+else
+    echo "virtualenv already installed."
+fi
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "$HOME/.iot_kit/iot_manager_env" ]; then
+    echo "Creating virtual environment..."
+    $HOME/.local/bin/virtualenv $HOME/.iot_kit/iot_manager_env -p python3
+else
+    echo "Virtual environment already exists."
+fi
+
+# Activate it
+echo "Activating virtual environment..."
+source $HOME/.iot_kit/iot_manager_env/bin/activate
+
+echo "Virtual environment ready!"
 
 # Check to see if root CA file exists, download if not
 if [ ! -f $HOME/.iot_kit/root-CA.crt ]; then
@@ -62,7 +84,7 @@ fi
 
 # Run the setup script to install required dependencies using setup.py
 printf "\nRunning setup.py to install dependencies for er_iot_manager...\n"
-python3 -m pip install $HOME/er_iot_manager
+pip3 install $HOME/er_iot_manager  # Uses venv's pip since it's activated
 
 source $HOME/.iot_kit/device.env
 
