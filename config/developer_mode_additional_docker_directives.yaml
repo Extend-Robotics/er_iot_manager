@@ -1,0 +1,32 @@
+---
+env:
+  insert_at_line: --privileged
+  prefix: -e
+  escape_line_ending: true
+  directives:
+    - QT_X11_NO_MITSHM=1
+    - '"DISPLAY=${DISPLAY:-:0.0}"'
+    - XDG_RUNTIME_DIR=/run/user/$(id -u)
+    - NVIDIA_DRIVER_CAPABILITIES=all
+    - NVIDIA_VISIBLE_DEVICES=all
+
+double_dash_args:
+  insert_at_line: --privileged
+  escape_line_ending: true
+  directives:
+    - --security-opt seccomp=unconfined
+    - --gpus all
+
+volumes:
+  insert_at_line: --privileged
+  prefix: -v
+  escape_line_ending: true
+  directives:
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - /dev/input:/dev/input:rw
+
+bash_directives:
+  insert_at_line: "CONTAINER_NAME="
+  escape_line_ending: false
+  directives:
+    - "xhost +local:"
