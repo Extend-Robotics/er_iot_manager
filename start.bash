@@ -49,18 +49,11 @@ if ! python3 -m pip --version &> /dev/null; then
   python3 /tmp/get-pip.py --user
 fi
 
-# Install virtualenv to user directory if not already installed
-if ! python3 -m pip show virtualenv &> /dev/null; then
-    echo "Installing virtualenv..."
-    python3 -m pip install virtualenv --user
-else
-    echo "virtualenv already installed."
-fi
-
-# Create virtual environment if it doesn't exist
+# Create virtual environment if it doesn't exist using venv (built-in to Python 3)
+# Use --system-site-packages to allow access to system packages like python3-apt
 if [ ! -d "$HOME/.iot_kit/iot_manager_env" ]; then
-    echo "Creating virtual environment..."
-    python3 -m virtualenv $HOME/.iot_kit/iot_manager_env -p python3
+    echo "Creating virtual environment with system site packages access..."
+    python3 -m venv --system-site-packages $HOME/.iot_kit/iot_manager_env
 else
     echo "Virtual environment already exists."
 fi
