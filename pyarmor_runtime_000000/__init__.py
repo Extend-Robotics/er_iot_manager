@@ -1,4 +1,4 @@
-# Pyarmor 9.2.3 (trial), 000000, 2026-01-08T22:32:26.299107
+# Pyarmor 9.2.3 (trial), 000000, 2026-01-15T16:17:44.159843
 from sys import version_info as py_version
 def __pyarmor__():
     import platform
