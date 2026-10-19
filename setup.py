@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="er_iot_manager",
-    version="3.6.4",
+    version="3.6.5",
     description="IoT device setup with AWS IoT SDK and boto3",
     packages=find_packages(),
     install_requires=[
